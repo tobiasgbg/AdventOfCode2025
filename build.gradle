@@ -1,0 +1,33 @@
+plugins {
+    id 'java'
+    id 'groovy'
+}
+
+group = 'org.example'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.apache.groovy:groovy-all:4.0.23'
+    implementation 'org.apache.groovy:groovy-all:4.0.23'
+    testImplementation 'org.spockframework:spock-core:2.3-groovy-4.0'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+// Task for Day 1
+task runDay1(type: JavaExec) {
+    mainClass = 'day1'
+    classpath = sourceSets.main.runtimeClasspath
+    workingDir = file('src/main/groovy')
+}
