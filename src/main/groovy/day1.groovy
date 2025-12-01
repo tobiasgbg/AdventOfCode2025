@@ -97,7 +97,6 @@ class SafeDial {
 
     int rotate(String instruction) {
         def m = instruction.trim() =~ /^([LR])(\d+)$/
-        if (!m) throw new IllegalArgumentException("Invalid instruction: $instruction")
         def (d, dist) = [m[0][1], m[0][2] as Integer]
         currentPosition = ((d == 'L' ? -dist : dist) + currentPosition + 100) % 100
         currentPosition
@@ -109,7 +108,6 @@ class SafeDial {
      */
     int rotateAndCountZeroCrossings(String instruction) {
         def m = instruction.trim() =~ /^([LR])(\d+)$/
-        if (!m) throw new IllegalArgumentException("Invalid instruction: $instruction")
         def (d, dist) = [m[0][1], m[0][2] as Integer]
         
         int direction = d == 'L' ? -1 : 1
@@ -120,12 +118,10 @@ class SafeDial {
     }
 
     static int calculatePassword(List<String> rotations) {
-        if (rotations == null) return 0
 
         def dial = new SafeDial()
         int count = 0
         rotations.each { instr ->
-            if (instr == null) return
             if (dial.rotate(instr) == 0) {
                 count++
             }
