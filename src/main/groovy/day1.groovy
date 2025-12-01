@@ -58,6 +58,34 @@ The dial is rotated L82 to point at 32.
 Because the dial points at 0 a total of three times during this process, the password in this example is 3.
 
 Analyze the rotations in your attached document. What's the actual password to open the door?
+
+--- Part Two ---
+You're sure that's the right password, but the door won't open. You knock, but nobody answers. You build a snowman while you think.
+
+As you're rolling the snowballs for your snowman, you find another security document that must have fallen into the snow:
+
+"Due to newer security protocols, please use password method 0x434C49434B until further notice."
+
+You remember from the training seminar that "method 0x434C49434B" means you're actually supposed to count the number of times any click causes the dial to point at 0, regardless of whether it happens during a rotation or at the end of one.
+
+Following the same rotations as in the above example, the dial points at zero a few extra times during its rotations:
+
+The dial starts by pointing at 50.
+The dial is rotated L68 to point at 82; during this rotation, it points at 0 once.
+The dial is rotated L30 to point at 52.
+The dial is rotated R48 to point at 0.
+The dial is rotated L5 to point at 95.
+The dial is rotated R60 to point at 55; during this rotation, it points at 0 once.
+The dial is rotated L55 to point at 0.
+The dial is rotated L1 to point at 99.
+The dial is rotated L99 to point at 0.
+The dial is rotated R14 to point at 14.
+The dial is rotated L82 to point at 32; during this rotation, it points at 0 once.
+In this example, the dial points at 0 three times at the end of a rotation, plus three more times during a rotation. So, in this example, the new password would be 6.
+
+Be careful: if the dial were pointing at 50, a single rotation like R1000 would cause the dial to point at 0 ten times before returning back to 50!
+
+Using password method 0x434C49434B, what is the password to open the door?
  */
 
 class SafeDial {
@@ -68,23 +96,62 @@ class SafeDial {
     }
 
     int rotate(String instruction) {
-        // TODO: Implement rotation logic
-        // Parse direction (L or R) and distance
-        // Apply rotation with wrapping (0-99)
-        // Return new position
-        return currentPosition
+        def m = instruction.trim() =~ /^([LR])(\d+)$/
+        if (!m) throw new IllegalArgumentException("Invalid instruction: $instruction")
+        def (d, dist) = [m[0][1], m[0][2] as Integer]
+        currentPosition = ((d == 'L' ? -dist : dist) + currentPosition + 100) % 100
+        currentPosition
+    }
+
+    /**
+     * Part 2: Counts zero crossings during rotation, not just final landing.
+     * Returns number of times the dial passes through or lands on 0.
+     */
+    int rotateAndCountZeroCrossings(String instruction) {
+        def m = instruction.trim() =~ /^([LR])(\d+)$/
+        if (!m) throw new IllegalArgumentException("Invalid instruction: $instruction")
+        def (d, dist) = [m[0][1], m[0][2] as Integer]
+        
+        int direction = d == 'L' ? -1 : 1
+        (1..dist).count {
+            currentPosition = (currentPosition + direction + 100) % 100
+            currentPosition == 0
+        }
     }
 
     static int calculatePassword(List<String> rotations) {
-        // TODO: Implement password calculation
-        // Count how many times the dial points at 0 during rotation sequence
-        return 0
+        if (rotations == null) return 0
+
+        def dial = new SafeDial()
+        int count = 0
+        rotations.each { instr ->
+            if (instr == null) return
+            if (dial.rotate(instr) == 0) {
+                count++
+            }
+        }
+        return count
+    }
+
+    static int calculatePasswordPart2(List<String> rotations) {
+        if (rotations == null) return 0
+
+        def dial = new SafeDial()
+        int count = 0
+        rotations.each { instr ->
+            if (instr == null) return
+            count += dial.rotateAndCountZeroCrossings(instr)
+        }
+        return count
     }
 }
 
 static void main(String[] args) {
-    List<String> fileContents = new File('../../../input/day1.txt').text.split('\n')
+    List<String> fileContents = new File('../../../input/day1.txt').text.split('\n').findAll { it.trim() }
 
     def password = SafeDial.calculatePassword(fileContents)
-    println("The password is: ${password}")
+    println("Part 1 - The password is: ${password}")
+    
+    def passwordPart2 = SafeDial.calculatePasswordPart2(fileContents)
+    println("Part 2 - The password is: ${passwordPart2}")
 }

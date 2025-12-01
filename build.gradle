@@ -7,8 +7,8 @@ group = 'org.example'
 version = '1.0-SNAPSHOT'
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 repositories {
@@ -23,6 +23,23 @@ dependencies {
 
 test {
     useJUnitPlatform()
+
+    // Show standard output and error
+    testLogging {
+        events "passed", "skipped", "failed", "standardOut", "standardError"
+        showExceptions true
+        showCauses true
+        showStackTraces true
+        exceptionFormat "full"
+
+        // Show more details about failures
+        showStandardStreams = true
+    }
+
+    // Generate HTML report
+    reports {
+        html.required = true
+    }
 }
 
 // Task for Day 1

@@ -81,7 +81,41 @@ class Day1Specification extends Specification {
             }
         }
 
-        then: "we should have crossed zero 3 times"
-        zeroCrossings == 3
+        then: "we should land on zero 1 time"
+        zeroCrossings == 1
+    }
+
+    // Part 2 Tests
+    def "should calculate correct password for example input part 2"() {
+        given: "the example rotations"
+        def rotations = [
+                "L68",
+                "L30",
+                "R48",
+                "L5",
+                "R60",
+                "L55",
+                "L1",
+                "L99",
+                "R14",
+                "L82"
+        ]
+
+        when: "we count zero crossings including during rotations"
+        def password = SafeDial.calculatePasswordPart2(rotations)
+
+        then: "the password should be 6 (3 landings + 3 during rotations)"
+        password == 6
+    }
+
+    def "should count zero crossings during large rotation"() {
+        given: "dial starts at 50"
+        def dial = new SafeDial(50)
+
+        when: "we rotate right by 1000"
+        def zeroCrossings = dial.rotateAndCountZeroCrossings("R1000")
+
+        then: "the dial should cross zero 10 times"
+        zeroCrossings == 10
     }
 }
