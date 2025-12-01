@@ -69,6 +69,7 @@ class SafeDial {
 
     int rotate(String instruction) {
         // TODO: Implement rotation logic
+        // Example R85
         // Parse direction (L or R) and distance
         // Apply rotation with wrapping (0-99)
         // Return new position
