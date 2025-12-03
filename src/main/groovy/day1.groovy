@@ -118,7 +118,6 @@ class SafeDial {
     }
 
     static int calculatePassword(List<String> rotations) {
-
         def dial = new SafeDial()
         int count = 0
         rotations.each { instr ->
@@ -130,8 +129,6 @@ class SafeDial {
     }
 
     static int calculatePasswordPart2(List<String> rotations) {
-        if (rotations == null) return 0
-
         def dial = new SafeDial()
         int count = 0
         rotations.each { instr ->
