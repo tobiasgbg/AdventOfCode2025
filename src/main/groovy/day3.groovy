@@ -39,9 +39,7 @@ class BatteryBank {
      * @return The joltage formed by concatenating the two digits
      */
     static int formJoltage(String bank, int pos1, int pos2) {
-        // TODO: Implement joltage formation
-        // Hint: Get characters at pos1 and pos2, concatenate them, convert to int
-        return 0
+        (bank[pos1].toString() + bank[pos2].toString()) as Integer
     }
 
     /**
@@ -50,9 +48,11 @@ class BatteryBank {
      * @return List of all possible joltages from choosing 2 batteries
      */
     static List<Integer> findAllJoltages(String bank) {
-        // TODO: Implement finding all joltages
-        // Hint: Try all pairs (i, j) where i < j
-        return []
+        (0..<bank.length()).collectMany { i ->
+            ((i+1)..<bank.length()).collect { j ->
+                formJoltage(bank, i, j)
+            }
+        }
     }
 
     /**
@@ -61,9 +61,7 @@ class BatteryBank {
      * @return The maximum joltage
      */
     static int findMaxJoltage(String bank) {
-        // TODO: Implement finding maximum joltage
-        // Hint: Find all joltages and return the maximum
-        return 0
+        findAllJoltages(bank).max()
     }
 
     /**
@@ -72,15 +70,55 @@ class BatteryBank {
      * @return The sum of maximum joltages from all banks
      */
     static int calculateTotalJoltage(List<String> banks) {
-        // TODO: Implement total joltage calculation
-        // Hint: Find max joltage for each bank and sum them
-        return 0
+        banks.sum { findMaxJoltage(it) }
+    }
+
+    // Part 2 methods - selecting 12 batteries instead of 2
+
+    /**
+     * Find the maximum joltage by selecting exactly 12 batteries.
+     * Uses a greedy algorithm to find the lexicographically largest subsequence.
+     * @param bank The battery bank string
+     * @return The maximum 12-digit joltage
+     */
+    static long findMaxJoltagePart2(String bank) {
+      def result = []
+      int pos = 0
+
+      while (result.size() < 12) {
+
+          int remaining = 12 - result.size()
+          int windowEnd = bank.length() - remaining
+
+          // Find max digit in window [pos..windowEnd]
+          def maxDigit = bank[pos..windowEnd].toList().max()
+          // Add it to result
+          result.add(maxDigit)
+          // Update pos to be right after where you found it
+          pos = pos + bank[pos..windowEnd].indexOf(maxDigit) + 1
+      }
+
+      result.join("") as Long
+    }
+
+    /**
+     * Calculate the total output joltage from all battery banks for Part 2.
+     * @param banks List of battery bank strings
+     * @return The sum of maximum 12-digit joltages from all banks
+     */
+    static long calculateTotalJoltagePart2(List<String> banks) {
+        banks.sum { findMaxJoltagePart2(it) }
     }
 }
 
 static void main(String[] args) {
     def banks = new File('../../../input/day3.txt').readLines()
 
+    // Part 1: Select 2 batteries
     def totalJoltage = BatteryBank.calculateTotalJoltage(banks)
-    println("Total output joltage: ${totalJoltage}")
+    println("Part 1 - Total output joltage (2 batteries): ${totalJoltage}")
+
+    // Part 2: Select 12 batteries
+    def totalJoltagePart2 = BatteryBank.calculateTotalJoltagePart2(banks)
+    println("Part 2 - Total output joltage (12 batteries): ${totalJoltagePart2}")
 }

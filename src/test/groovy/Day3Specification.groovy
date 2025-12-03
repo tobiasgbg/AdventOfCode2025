@@ -86,4 +86,65 @@ class Day3Specification extends Specification {
         joltages.contains(15) // positions 0,4
         joltages.contains(45) // positions 3,4
     }
+
+    // Part 2 tests - selecting 12 batteries
+    def "should find maximum 12-digit joltage 987654321111 from bank 987654321111111"() {
+        given: "a battery bank"
+        def bank = "987654321111111"
+
+        when: "we find the maximum 12-digit joltage"
+        def maxJoltage = BatteryBank.findMaxJoltagePart2(bank)
+
+        then: "should be 987654321111"
+        maxJoltage == 987654321111L
+    }
+
+    def "should find maximum 12-digit joltage 811111111119 from bank 811111111111119"() {
+        given: "a battery bank"
+        def bank = "811111111111119"
+
+        when: "we find the maximum 12-digit joltage"
+        def maxJoltage = BatteryBank.findMaxJoltagePart2(bank)
+
+        then: "should be 811111111119"
+        maxJoltage == 811111111119L
+    }
+
+    def "should find maximum 12-digit joltage 434234234278 from bank 234234234234278"() {
+        given: "a battery bank"
+        def bank = "234234234234278"
+
+        when: "we find the maximum 12-digit joltage"
+        def maxJoltage = BatteryBank.findMaxJoltagePart2(bank)
+
+        then: "should be 434234234278"
+        maxJoltage == 434234234278L
+    }
+
+    def "should find maximum 12-digit joltage 888911112111 from bank 818181911112111"() {
+        given: "a battery bank"
+        def bank = "818181911112111"
+
+        when: "we find the maximum 12-digit joltage"
+        def maxJoltage = BatteryBank.findMaxJoltagePart2(bank)
+
+        then: "should be 888911112111"
+        maxJoltage == 888911112111L
+    }
+
+    def "should calculate total output joltage 3121910778619 for example input part 2"() {
+        given: "the example battery banks"
+        def banks = [
+            "987654321111111",
+            "811111111111119",
+            "234234234234278",
+            "818181911112111"
+        ]
+
+        when: "we calculate the total output joltage for part 2"
+        def totalJoltage = BatteryBank.calculateTotalJoltagePart2(banks)
+
+        then: "should be 3121910778619"
+        totalJoltage == 3121910778619L
+    }
 }
