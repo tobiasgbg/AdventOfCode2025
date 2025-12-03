@@ -81,24 +81,17 @@ class BatteryBank {
      * @param bank The battery bank string
      * @return The maximum 12-digit joltage
      */
-    static long findMaxJoltagePart2(String bank) {
-      def result = []
-      int pos = 0
-
-      while (result.size() < 12) {
-
-          int remaining = 12 - result.size()
-          int windowEnd = bank.length() - remaining
-
-          // Find max digit in window [pos..windowEnd]
-          def maxDigit = bank[pos..windowEnd].toList().max()
-          // Add it to result
-          result.add(maxDigit)
-          // Update pos to be right after where you found it
-          pos = pos + bank[pos..windowEnd].indexOf(maxDigit) + 1
-      }
-
-      result.join("") as Long
+     static long findMaxJoltagePart2(String bank, int count = 12) {
+      (1..count).inject([result: '', pos: 0]) { acc, _ ->
+          def remaining = count - acc.result.size()
+          def windowEnd = bank.length() - remaining
+          def window = bank[acc.pos..windowEnd]
+          def maxDigit = window.toList().max()
+          [
+              result: acc.result + maxDigit,
+              pos: acc.pos + window.indexOf(maxDigit) + 1
+          ]
+      }.result as Long
     }
 
     /**
