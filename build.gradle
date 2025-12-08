@@ -90,3 +90,10 @@ task runDay7(type: JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     workingDir = file('src/main/groovy')
 }
+
+// Task for Day 8
+task runDay8(type: JavaExec) {
+    mainClass = 'day8'
+    classpath = sourceSets.main.runtimeClasspath
+    workingDir = file('src/main/groovy')
+}
