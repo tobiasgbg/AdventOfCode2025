@@ -157,8 +157,7 @@ class ChristmasTreeFarm {
      * Part 1: Count how many regions can fit all their required presents
      */
     int countFittableRegions() {
-        // TODO: Implement
-        0
+        regions.count{ region -> canFitPresents(region) }
     }
 
     /**
