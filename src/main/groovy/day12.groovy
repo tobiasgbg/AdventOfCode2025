@@ -80,7 +80,7 @@ Consider the regions beneath each tree and the presents the Elves would like to 
 class Shape {
     int index
     Set<List<Integer>> cells = [] as Set  // Set of [x, y] coordinates where # appears
-    List<Set<List<Integer>>> cachedOrientations = null  // Cache orientations
+    List<int[][]> cachedOrientations = null  // Cache orientations as int arrays
 
     Shape(int index, List<String> lines) {
         this.index = index
@@ -91,9 +91,9 @@ class Shape {
     }
 
     /**
-     * Generate all unique orientations (rotations and flips) of this shape
+     * Generate all unique orientations as int[][] arrays for fast iteration
      */
-    List<Set<List<Integer>>> getAllOrientations() {
+    List<int[][]> getAllOrientations() {
         if (cachedOrientations != null) return cachedOrientations
 
         def orientations = [] as Set
@@ -106,7 +106,10 @@ class Shape {
             }
         }
 
-        cachedOrientations = orientations as List
+        // Convert to int[][] for faster iteration
+        cachedOrientations = orientations.collect { cellSet ->
+            cellSet.collect { [it[0] as int, it[1] as int] as int[] } as int[][]
+        }
         cachedOrientations
     }
 
@@ -114,7 +117,7 @@ class Shape {
      * Transform cells by flipping and rotating
      */
     private Set<List<Integer>> transform(Set<List<Integer>> cells, boolean flip, int degrees) {
-        def result = cells.collect { coord ->
+        cells.collect { coord ->
             def (x, y) = coord
             if (flip) x = -x
 
@@ -125,7 +128,6 @@ class Shape {
                 default:  return [x, y]
             }
         } as Set
-        result
     }
 
     /**
@@ -198,8 +200,6 @@ class ChristmasTreeFarm {
         if (currentIndex >= 0 && shapeLines) {
             shapes.add(new Shape(currentIndex, shapeLines))
         }
-
-        // Parsed ${shapes.size()} shapes and ${regions.size()} regions
     }
 
     /**
@@ -219,7 +219,7 @@ class ChristmasTreeFarm {
 
             println "Checking region ${idx+1}/${regions.size()}: ${region.width}x${region.height}, ${pieces.size()} pieces, ${totalCells} cells..."
             long startTime = System.currentTimeMillis()
-            def fits = canFitPresents(region, 5000) // 5 second timeout per region
+            def fits = canFitPresentsFast(region)
             long elapsed = System.currentTimeMillis() - startTime
 
             println "  -> ${fits ? 'FITS' : 'DOES NOT FIT'} (${elapsed}ms)"
@@ -230,191 +230,214 @@ class ChristmasTreeFarm {
     }
 
     /**
-     * Check if a region can fit all its required presents
+     * Optimized solver using BitSet for O(1) collision detection
      */
-    boolean canFitPresents(Region region, long timeoutMs = 10000) {
-        // Build list of presents to place
-        def presentsToPlace = []
+    boolean canFitPresentsFast(Region region) {
+        int width = region.width
+        int height = region.height
+        int totalCells = width * height
+
+        // Build list of pieces to place
+        def pieces = []
         region.presentCounts.eachWithIndex { count, shapeIndex ->
             count.times {
-                // Find the shape with matching index (not array position!)
                 def shape = shapes.find { it.index == shapeIndex }
-                if (shape) {
-                    presentsToPlace << shape
-                }
+                if (shape) pieces << shape
             }
         }
 
-        if (presentsToPlace.isEmpty()) return true  // No presents to place
+        if (pieces.isEmpty()) return true
 
-        // Start backtracking with empty grid and all pieces unplaced
-        def occupied = [] as Set
-        def placed = new boolean[presentsToPlace.size()]
-        long deadline = System.currentTimeMillis() + timeoutMs
-        backtrackIndexed(presentsToPlace, placed, region, occupied, deadline)
+        // Quick area check
+        int neededCells = pieces.sum { it.cells.size() }
+        if (neededCells > totalCells) return false
+
+        // Pre-compute all valid placements as BitSets for each piece
+        List<List<BitSet>> allPlacements = pieces.collect { shape ->
+            def placements = [] as Set  // Use Set to deduplicate
+            for (int[][] orientation : shape.getAllOrientations()) {
+                for (int y = 0; y < height; y++) {
+                    for (int x = 0; x < width; x++) {
+                        BitSet bits = new BitSet(totalCells)
+                        boolean valid = true
+                        for (int[] cell : orientation) {
+                            int px = cell[0] + x
+                            int py = cell[1] + y
+                            if (px < 0 || px >= width || py < 0 || py >= height) {
+                                valid = false
+                                break
+                            }
+                            bits.set(py * width + px)
+                        }
+                        if (valid) placements << bits
+                    }
+                }
+            }
+            placements as List
+        }
+
+        // Check if any piece has no valid placements
+        if (allPlacements.any { it.isEmpty() }) return false
+
+        // Sort pieces by number of placements (most constrained first)
+        def indices = (0..<pieces.size()).toList()
+        indices.sort { allPlacements[it].size() }
+
+        // Reorder placements according to sorted indices
+        def sortedPlacements = indices.collect { allPlacements[it] }
+
+        // Backtrack with BitSet
+        BitSet occupied = new BitSet(totalCells)
+        backtrackBitSet(sortedPlacements, 0, occupied, totalCells, 0, null, false)
     }
 
     /**
-     * Indexed backtracking - faster than creating new lists
+     * Fast backtracking using BitSet for collision detection
      */
-    private boolean backtrackIndexed(List<Shape> allPieces, boolean[] placed, Region region, Set<List<Integer>> occupied, long deadline) {
-        // Check timeout every so often
-        if (System.currentTimeMillis() > deadline) {
-            return false  // Timeout - assume doesn't fit
+    private long deadline = 0
+    private int iterations = 0
+
+    private boolean backtrackBitSet(List<List<BitSet>> allPlacements, int pieceIdx, BitSet occupied, int totalCells,
+                                    int width = 0, List<BitSet> solution = null, boolean debug = false) {
+        if (pieceIdx >= allPlacements.size()) return true
+
+        // Check timeout periodically
+        if (++iterations % 10000 == 0 && deadline > 0 && System.currentTimeMillis() > deadline) {
+            return false
         }
 
-        // Count how many pieces are left (manually to avoid potential issues with boolean[])
-        def remaining = 0
-        for (int i = 0; i < placed.length; i++) {
-            if (!placed[i]) remaining++
-        }
-
-        if (remaining == 0) {
-            return true  // All pieces successfully placed
-        }
-
-        // Pruning: check if enough space remains
-        def remainingCells = region.width * region.height - occupied.size()
-        def neededCells = 0
-        for (int i = 0; i < allPieces.size(); i++) {
-            if (!placed[i]) neededCells += allPieces[i].cells.size()
-        }
-        if (remainingCells < neededCells) return false
-
-        // Find most-constrained unplaced piece
-        def bestIdx = -1
-        def bestPlacements = null
-        def minPlacements = Integer.MAX_VALUE
-
-        for (int i = 0; i < allPieces.size(); i++) {
-            if (placed[i]) continue  // Skip already placed pieces
-
-            def placements = getValidPlacements(allPieces[i], region, occupied)
-            if (placements.size() < minPlacements) {
-                minPlacements = placements.size()
-                bestIdx = i
-                bestPlacements = placements
+        // Pruning: check remaining space
+        int usedCells = occupied.cardinality()
+        int neededCells = 0
+        for (int i = pieceIdx; i < allPlacements.size(); i++) {
+            if (!allPlacements[i].isEmpty()) {
+                neededCells += allPlacements[i][0].cardinality()
             }
-            if (minPlacements == 0) break  // Early exit
         }
+        if (usedCells + neededCells > totalCells) return false
 
-        if (bestIdx == -1 || bestPlacements.isEmpty()) return false
+        // Filter valid placements for current piece
+        def validPlacements = allPlacements[pieceIdx].findAll { !occupied.intersects(it) }
+        if (validPlacements.isEmpty()) return false
 
-        // Try each valid placement for the chosen piece
-        for (placement in bestPlacements) {
-            occupied.addAll(placement)
-            placed[bestIdx] = true
-
-            if (backtrackIndexed(allPieces, placed, region, occupied, deadline)) {
+        // Try each valid placement
+        for (BitSet placement : validPlacements) {
+            // Set bits (Groovy's BitSet.or() doesn't modify in place!)
+            for (int bit = placement.nextSetBit(0); bit >= 0; bit = placement.nextSetBit(bit + 1)) {
+                occupied.set(bit)
+            }
+            if (solution != null) solution[pieceIdx] = placement
+            if (backtrackBitSet(allPlacements, pieceIdx + 1, occupied, totalCells, width, solution, debug)) {
                 return true
             }
-
-            occupied.removeAll(placement)
-            placed[bestIdx] = false
+            // Clear the bits we set
+            for (int bit = placement.nextSetBit(0); bit >= 0; bit = placement.nextSetBit(bit + 1)) {
+                occupied.clear(bit)
+            }
         }
 
         false
     }
 
     /**
-     * Select the piece with fewest valid placements (most-constrained-first heuristic)
+     * Debug: solve and print the solution
      */
-    private Tuple2 selectMostConstrainedPiece(List<Shape> pieces, Region region, Set<List<Integer>> occupied) {
-        def bestPiece = null
-        def bestPlacements = null
-        def minPlacements = Integer.MAX_VALUE
+    boolean canFitPresentsFastDebug(Region region) {
+        int width = region.width
+        int height = region.height
+        int totalCells = width * height
 
-        for (piece in pieces) {
-            def placements = getValidPlacements(piece, region, occupied)
-            if (placements.size() < minPlacements) {
-                minPlacements = placements.size()
-                bestPiece = piece
-                bestPlacements = placements
+        def pieces = []
+        region.presentCounts.eachWithIndex { count, shapeIndex ->
+            count.times {
+                def shape = shapes.find { it.index == shapeIndex }
+                if (shape) pieces << shape
             }
-            // Early exit if we find a piece with no placements
-            if (minPlacements == 0) break
         }
 
-        new Tuple2(bestPiece, bestPlacements ?: [])
-    }
+        if (pieces.isEmpty()) return true
 
-    /**
-     * Get all valid placements for a piece
-     */
-    private List<Set<List<Integer>>> getValidPlacements(Shape shape, Region region, Set<List<Integer>> occupied) {
-        def placements = []
+        int neededCells = pieces.sum { it.cells.size() }
+        if (neededCells > totalCells) return false
 
-        for (orientation in shape.getAllOrientations()) {
-            for (y in 0..<region.height) {
-                for (x in 0..<region.width) {
-                    def placedCells = orientation.collect { coord ->
-                        [coord[0] + x, coord[1] + y]
-                    } as Set
-
-                    if (isValidPlacement(placedCells, region, occupied)) {
-                        placements << placedCells
+        List<List<BitSet>> allPlacements = pieces.collect { shape ->
+            def placements = [] as Set
+            for (int[][] orientation : shape.getAllOrientations()) {
+                for (int y = 0; y < height; y++) {
+                    for (int x = 0; x < width; x++) {
+                        BitSet bits = new BitSet(totalCells)
+                        boolean valid = true
+                        for (int[] cell : orientation) {
+                            int px = cell[0] + x
+                            int py = cell[1] + y
+                            if (px < 0 || px >= width || py < 0 || py >= height) {
+                                valid = false
+                                break
+                            }
+                            bits.set(py * width + px)
+                        }
+                        if (valid) placements << bits
                     }
                 }
             }
+            placements as List
         }
 
-        placements
-    }
+        if (allPlacements.any { it.isEmpty() }) return false
 
-    /**
-     * Forward checking: verify each remaining piece has at least one valid placement
-     */
-    private boolean forwardCheck(List<Shape> remaining, Region region, Set<List<Integer>> occupied) {
-        // Quick check: is there enough space?
-        def remainingCells = region.width * region.height - occupied.size()
-        def neededCells = remaining.sum(0) { it.cells.size() }
-        if (remainingCells < neededCells) return false
+        println "Pieces to place: ${pieces.size()}"
+        allPlacements.eachWithIndex { placements, idx ->
+            def cellCount = placements.isEmpty() ? 0 : placements[0].cardinality()
+            println "  Piece $idx (shape ${pieces[idx].index}): ${placements.size()} placements, $cellCount cells each"
+        }
 
-        // More thorough check: verify we can place at least one more piece
-        // (checking all pieces would be too expensive, this is a compromise)
-        if (!remaining.isEmpty() && remaining.size() <= 3) {
-            // For small remaining sets, check all pieces have placements
-            for (shape in remaining) {
-                if (!hasValidPlacement(shape, region, occupied)) {
-                    return false
+        def indices = (0..<pieces.size()).toList()
+        indices.sort { allPlacements[it].size() }
+        def sortedPlacements = indices.collect { allPlacements[it] }
+        def sortedPieces = indices.collect { pieces[it] }
+
+        BitSet occupied = new BitSet(totalCells)
+        List<BitSet> solution = new ArrayList<>(sortedPlacements.size())
+        sortedPlacements.size().times { solution.add(null) }
+
+        boolean found = backtrackBitSet(sortedPlacements, 0, occupied, totalCells, width, solution, true)
+
+        if (found) {
+            println "Found solution:"
+            println "Solution list size: ${solution.size()}"
+            solution.eachWithIndex { bs, idx ->
+                if (bs != null) {
+                    def bits = []
+                    for (int bit = bs.nextSetBit(0); bit >= 0; bit = bs.nextSetBit(bit + 1)) {
+                        bits << "[${bit % width},${bit / width as int}]"
+                    }
+                    println "  Piece $idx: ${bits.join(', ')}"
+                } else {
+                    println "  Piece $idx: NULL"
                 }
             }
-        }
-
-        true
-    }
-
-    /**
-     * Check if a shape has at least one valid placement
-     */
-    private boolean hasValidPlacement(Shape shape, Region region, Set<List<Integer>> occupied) {
-        for (orientation in shape.getAllOrientations()) {
-            for (y in 0..<region.height) {
-                for (x in 0..<region.width) {
-                    def placedCells = orientation.collect { coord ->
-                        [coord[0] + x, coord[1] + y]
-                    } as Set
-
-                    if (isValidPlacement(placedCells, region, occupied)) {
-                        return true  // Found at least one valid placement
+            char[][] grid = new char[height][width]
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    grid[y][x] = '.'
+                }
+            }
+            solution.eachWithIndex { bs, idx ->
+                if (bs != null) {
+                    char label = (char)('A'.charAt(0) + idx)
+                    for (int bit = bs.nextSetBit(0); bit >= 0; bit = bs.nextSetBit(bit + 1)) {
+                        int x = bit % width
+                        int y = bit / width
+                        grid[y][x] = label
                     }
                 }
             }
+            for (int y = 0; y < height; y++) {
+                println new String(grid[y])
+            }
         }
-        false
-    }
 
-    /**
-     * Check if placement is valid (within bounds and no overlap)
-     */
-    private boolean isValidPlacement(Set<List<Integer>> cells, Region region, Set<List<Integer>> occupied) {
-        cells.every { coord ->
-            def (x, y) = coord
-            // Check bounds
-            x >= 0 && x < region.width && y >= 0 && y < region.height &&
-            // Check no overlap
-            !occupied.contains(coord)
-        }
+        found
     }
 }
 
