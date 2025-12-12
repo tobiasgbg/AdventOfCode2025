@@ -91,6 +91,16 @@ class Day12Specification extends Specification {
         farm.regions[2].presentCounts == [1, 0, 1, 0, 3, 2]
     }
 
+    def "should generate shape orientations"() {
+        when: "we get orientations for shape 4"
+        def farm = new ChristmasTreeFarm(exampleInput)
+        def shape4 = farm.shapes[4]
+        def orientations = shape4.orientations
+
+        then: "each orientation has 7 cells"
+        orientations.every { it.length == 7 }
+    }
+
     def "should count fittable regions in example"() {
         when: "we count fittable regions"
         def farm = new ChristmasTreeFarm(exampleInput)
@@ -98,36 +108,5 @@ class Day12Specification extends Specification {
 
         then: "should be 2 (first two regions fit, third doesn't)"
         result == 2
-    }
-
-    def "debug third region"() {
-        when: "we try to fit the third region"
-        def farm = new ChristmasTreeFarm(exampleInput)
-        println "Third region: ${farm.regions[2].width}x${farm.regions[2].height}"
-        println "Present counts: ${farm.regions[2].presentCounts}"
-        def fits = farm.canFitPresentsFastDebug(farm.regions[2])
-
-        then: "debug output"
-        !fits  // third region should NOT fit
-    }
-
-    def "debug shape orientations"() {
-        when: "we check shape 4 orientations"
-        def farm = new ChristmasTreeFarm(exampleInput)
-        def shape4 = farm.shapes[4]
-        println "Shape 4 original cells: ${shape4.cells}"
-        println "Shape 4 cell count: ${shape4.cells.size()}"
-
-        def orientations = shape4.getAllOrientations()
-        println "Number of orientations: ${orientations.size()}"
-        orientations.eachWithIndex { orientation, idx ->
-            println "Orientation $idx: ${orientation.length} cells"
-            orientation.each { cell ->
-                println "  [${cell[0]}, ${cell[1]}]"
-            }
-        }
-
-        then: "each orientation should have 7 cells"
-        orientations.every { it.length == 7 }
     }
 }
